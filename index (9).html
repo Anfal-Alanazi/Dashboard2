@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projects — Revenue Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="loadXlsxFallback()"></script>
+<script>
+  let xlsxFallbackTried = 0;
+  function loadXlsxFallback(){
+    const sources = [
+      'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+      'https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js'
+    ];
+    if(xlsxFallbackTried >= sources.length) return;
+    const s = document.createElement('script');
+    s.src = sources[xlsxFallbackTried];
+    xlsxFallbackTried++;
+    s.onerror = loadXlsxFallback;
+    document.head.appendChild(s);
+  }
+</script>
+<style>
+  :root{
+    --bg:#f3f4f7;
+    --card:#ffffff;
+    --border:#e6e8ee;
+    --text:#1a2233;
+    --muted:#68708a;
+    --blue:#2f7a99;
+    --blue-light:#cfe4ec;
+    --amber:#d99a2b;
+    --green:#1a9d5c;
+    --red:#c94a3f;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    padding:28px 32px 48px;
+  }
+  .header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    flex-wrap:wrap;
+    gap:12px;
+    margin-bottom:22px;
+  }
+  h1{
+    font-size:26px;
+    margin:0 0 4px 0;
+    font-weight:700;
+    letter-spacing:-0.3px;
+  }
+  .subtitle{
+    color:var(--muted);
+    font-size:13.5px;
+    margin:0;
+  }
+  .header-right{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .badge{
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:9px 16px;
+    font-size:13px;
+    color:var(--text);
+    display:flex;
+    align-items:center;
+    gap:6px;
+    white-space:nowrap;
+  }
+  .dot{
+    width:7px;height:7px;border-radius:50%;
+    background:var(--green);
+    display:inline-block;
+  }
+  .dot.stale{ background: var(--amber); }
+  .load-btn{
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    padding:10px 18px;
+    font-size:13.5px;
+    font-weight:600;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .load-btn:hover{ background:#286a86; }
+  .watch-btn{ background:#1a9d5c; }
+  .watch-btn:hover{ background:#157d49; }
+  .watch-btn.watching{ background:#157d49; }
+  #unsupportedNote{
+    display:none;
+    font-size:11.5px;
+    color:var(--muted);
+    max-width:260px;
+  }
+  #fileInput{ display:none; }
+  .file-name{
+    font-size:12px;
+    color:var(--muted);
+    max-width:220px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  .filters{
+    display:flex;
+    gap:14px;
+    margin-bottom:22px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .cloud-link-row{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px 16px;
+    margin-bottom:22px;
+  }
+  .cloud-link-row input[type="text"]{
+    flex:1;
+    min-width:260px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:9px 12px;
+    font-size:13px;
+    font-family:inherit;
+  }
+  .cloud-link-row input[type="text"]:focus{ outline:2px solid var(--blue); outline-offset:-1px; }
+  .filter-box{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:8px 16px;
+    min-width:170px;
+  }
+  .filter-label{
+    font-size:11.5px;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    gap:5px;
+    margin-bottom:2px;
+  }
+  select{
+    border:none;
+    background:transparent;
+    font-size:15px;
+    font-weight:600;
+    color:var(--text);
+    width:100%;
+    appearance:none;
+    -webkit-appearance:none;
+    padding-right:18px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%2368708a'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right center;
+    cursor:pointer;
+  }
+  select:focus{outline:none;}
+
+  .multi-filter-box{ position:relative; }
+  .multi-select-btn{
+    border:none;
+    background:transparent;
+    font-size:15px;
+    font-weight:600;
+    color:var(--text);
+    width:100%;
+    text-align:left;
+    cursor:pointer;
+    padding:0;
+    font-family:inherit;
+  }
+  .multi-select-btn::after{
+    content:'';
+    display:inline-block;
+    width:0; height:0;
+    margin-left:8px;
+    border-left:5px solid transparent;
+    border-right:5px solid transparent;
+    border-top:6px solid var(--muted);
+    vertical-align:middle;
+  }
+  .multi-select-panel{
+    display:none;
+    position:absolute;
+    top:100%; left:0;
+    margin-top:6px;
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:10px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.08);
+    padding:8px;
+    z-index:20;
+    min-width:150px;
+  }
+  .multi-select-panel.open{ display:block; }
+  .multi-select-panel label{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:6px 8px;
+    font-size:13.5px;
+    border-radius:6px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .multi-select-panel label:hover{ background:#f3f4f7; }
+  .multi-select-panel input[type="checkbox"]{ cursor:pointer; }
+
+  #errorBanner{
+    display:none;
+    background:#fdecea;
+    border:1px solid #f5c2bc;
+    color:var(--red);
+    border-radius:10px;
+    padding:12px 16px;
+    font-size:13.5px;
+    margin-bottom:18px;
+  }
+
+  .kpi-row{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:16px;
+    margin-bottom:20px;
+  }
+  .kpi{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:16px 18px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    min-height:130px;
+  }
+  .kpi-title{
+    font-size:12.5px;
+    color:var(--muted);
+    margin-bottom:8px;
+  }
+  .kpi-value{
+    font-size:21px;
+    font-weight:700;
+    line-height:1.2;
+    margin-bottom:10px;
+  }
+  .kpi-sub{
+    font-size:12px;
+    color:var(--muted);
+  }
+  .kpi-sub.pos{color:var(--green);font-weight:600;}
+  .kpi-sub.amber{color:var(--amber);font-weight:600;}
+
+  .charts-row{
+    display:grid;
+    grid-template-columns:1.35fr 1fr 0.9fr;
+    gap:16px;
+  }
+  .panel{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:18px 20px 12px;
+  }
+  .panel h3{
+    font-size:15px;
+    margin:0 0 14px 0;
+    font-weight:700;
+  }
+  .chart-svg-wrap{ width:100%; }
+  .chart-svg-wrap svg{ width:100%; height:auto; display:block; }
+  .legend{
+    display:flex;
+    gap:18px;
+    justify-content:center;
+    margin-top:6px;
+    font-size:12.5px;
+    color:var(--muted);
+  }
+  .legend span{display:flex;align-items:center;gap:6px;}
+  .legend i{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .donut-legend{
+    display:flex;
+    justify-content:center;
+    gap:16px;
+    font-size:12.5px;
+    color:var(--muted);
+    margin-top:8px;
+  }
+  .donut-legend span{display:flex;align-items:center;gap:6px;}
+  .donut-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;}
+
+  .courses-table{
+    width:auto;
+    min-width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+  }
+  .courses-table th{
+    text-align:left;
+    padding:9px 18px;
+    color:var(--muted);
+    font-weight:600;
+    font-size:11.5px;
+    border-bottom:2px solid var(--border);
+    white-space:nowrap;
+  }
+  .courses-table th.num{ text-align:right; }
+  .courses-table td{
+    padding:9px 18px;
+    border-bottom:1px solid var(--border);
+    white-space:nowrap;
+  }
+  .courses-table tbody tr:hover{ background:#f8f9fb; }
+  .courses-table td.num{ text-align:right; font-variant-numeric:tabular-nums; }
+  .courses-table td.total{ font-weight:700; }
+  .courses-table td.zero{ color:#c7cbd4; }
+
+  @media (max-width: 1150px){
+    .kpi-row{grid-template-columns:repeat(3,1fr);}
+    .charts-row{grid-template-columns:1fr;}
+  }
+  @media (max-width: 640px){
+    .kpi-row{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <h1>Projects — Revenue Dashboard</h1>
+      <p class="subtitle"><span id="companyLabel">All Companies</span> · <span id="txnCountLabel">299</span> transactions · <span id="yearRangeLabel">FY2025–FY2026</span></p>
+    </div>
+    <div class="header-right">
+      <span class="file-name" id="fileNameLabel">Showing sample data</span>
+      <button class="load-btn watch-btn" id="watchBtn">🔄 ربط ملف Excel (تحديث تلقائي - جهازي فقط)</button>
+      <button class="load-btn" id="loadBtn">⬆ Load Excel File</button>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      <div class="badge"><span class="dot" id="statusDot"></span> <span id="statusText">Sample data</span> · Currency: <strong>&nbsp;SAR</strong></div>
+    </div>
+  </div>
+
+  <div class="cloud-link-row" id="cloudLinkRow">
+    <div class="filter-label">☁️ رابط OneDrive/SharePoint (يتحدث عند الجميع تلقائيًا)</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <input type="text" id="cloudUrlInput" placeholder="الصق رابط المشاركة هنا (Share link)">
+      <button class="load-btn" id="cloudConnectBtn">🔗 ربط سحابي</button>
+    </div>
+  </div>
+
+
+  <div id="errorBanner"></div>
+
+  <div class="filters">
+    <div class="filter-box">
+      <div class="filter-label">🏢 Company</div>
+      <select id="companyFilter">
+        <option value="all">All Companies</option>
+      </select>
+    </div>
+    <div class="filter-box multi-filter-box" id="yearFilterBox">
+      <div class="filter-label">🗓 Year</div>
+      <button type="button" class="multi-select-btn" id="yearFilterBtn">All Years</button>
+      <div class="multi-select-panel" id="yearFilterPanel"></div>
+    </div>
+    <div class="filter-box">
+      <div class="filter-label">Billing Status</div>
+      <select id="statusFilter">
+        <option value="all">All</option>
+        <option value="billed">Billed</option>
+        <option value="unbilled">Unbilled</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:16px;">
+    <h3>Courses by Company — Revenue (2024–2026)</h3>
+    <div style="overflow-x:auto;">
+      <table id="coursesTable" class="courses-table">
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Course</th>
+            <th class="num">Revenue 2024</th>
+            <th class="num">Revenue 2025</th>
+            <th class="num">Revenue 2026</th>
+            <th class="num">Total Revenue</th>
+          </tr>
+        </thead>
+        <tbody id="coursesTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-title">Total Revenue</div>
+      <div class="kpi-value" id="kpiTotal">—</div>
+      <div class="kpi-sub" id="kpiTotalSub">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-title">Billed Revenue</div>
+      <div class="kpi-value" id="kpiBilled">—</div>
+      <div class="kpi-sub pos" id="kpiBilledSub">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-title">Unbilled Revenue</div>
+      <div class="kpi-value" id="kpiUnbilled">—</div>
+      <div class="kpi-sub amber" id="kpiUnbilledSub">—</div>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="panel">
+      <h3>Cumulative Revenue Trend</h3>
+      <div id="trendChart" class="chart-svg-wrap"></div>
+      <div class="legend">
+        <span><i style="background:var(--blue)"></i>Cumulative Billed</span>
+        <span><i style="background:var(--amber)"></i>Cumulative Unbilled</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Billed vs Unbilled by Year</h3>
+      <div id="barChart" class="chart-svg-wrap"></div>
+      <div class="legend">
+        <span><i style="background:var(--blue)"></i>Billed</span>
+        <span><i style="background:var(--amber)"></i>Unbilled</span>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Revenue Split</h3>
+      <div id="donutChart" class="chart-svg-wrap"></div>
+      <div class="donut-legend" id="donutLegend"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px;">
+    <h3>Monthly Revenue</h3>
+    <div id="monthlyChart" class="chart-svg-wrap"></div>
+    <div class="legend">
+      <span><i style="background:var(--blue)"></i>Billed</span>
+      <span><i style="background:var(--amber)"></i>Unbilled</span>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px;">
+    <h3>Average Revenue per Company — Billed vs Unbilled</h3>
+    <div id="companyAvgChart" class="chart-svg-wrap"></div>
+    <div class="legend">
+      <span><i style="background:var(--blue)"></i>Avg Billed</span>
+      <span><i style="background:var(--amber)"></i>Avg Unbilled</span>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px;">
+    <h3>Average Revenue per Service — Billed vs Unbilled</h3>
+    <div id="serviceAvgChart" class="chart-svg-wrap"></div>
+    <div class="legend">
+      <span><i style="background:var(--blue)"></i>Avg Billed</span>
+      <span><i style="background:var(--amber)"></i>Avg Unbilled</span>
+    </div>
+  </div>
+
+
+<script>
+/* ============================================================
+   DATA CONTRACT — your Excel file needs these columns
+   (case-insensitive, any column order):
+     Date     -> any date value (used for chart ordering)
+     Year     -> e.g. 2025
+     Status   -> "Billed" or "Unbilled"
+     Amount (SAR) -> number  (a column simply named "Amount" also works)
+   First sheet in the workbook is used.
+   ============================================================ */
+
+const blue = '#2f7a99';
+const blueLight = 'rgba(47,122,153,0.12)';
+const amber = '#d99a2b';
+
+let allTxns = [];
+let years = [];
+let companies = [];
+
+// ---------- Embedded data from Projects_2.xlsb -> "Arabian Drilling" sheet ----------
+// [date, year, status, amount] for all 154 rows (Start Date, Billed/Unbilled, Revenue)
+const EMBEDDED_TRANSACTIONS = [["2024-07-04",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-07-05",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-07-09",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-07-11",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-07-16",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-07-19",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-07-25",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-07-26",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-07-26",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-08-15",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-08-21",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-08-23",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-08-24",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-08-30",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-09-06",2024,"billed",85500.0,"Aramco Rawan","Behavior Based Safety Coach",85500.0],["2024-09-15",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-09-28",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-10-05",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-10-10",2024,"unbilled",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-11-05",2024,"billed",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2024-11-22",2024,"billed",162588.62,"Aramco Rawan","Behavior Based Safety Coach",162588.62],["2024-11-28",2024,"billed",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2024-12-12",2024,"billed",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2024-12-13",2024,"billed",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2024-12-26",2024,"unbilled",64177.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2024-12-30",2024,"billed",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2025-01-01",2025,"unbilled",155400.0,"Maharat (Takamol )","Takamol Training Program",350.0],["2025-01-01",2025,"unbilled",206150.0,"Maharat (Takamol )","Takamol Training Program",350.0],["2025-01-01",2025,"billed",46800.0,"Maharat","Occupational Health & Safety Management",2600.0],["2025-01-10",2025,"billed",42750.0,"ADES","Behavior Based Safety Coach",2850.0],["2025-01-10",2025,"billed",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2025-01-23",2025,"unbilled",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2025-02-01",2025,"billed",46800.0,"Maharat","Occupational Health & Safety Management",2600.0],["2025-02-03",2025,"billed",51300.0,"ADES","Behavior Based Safety Coach",2850.0],["2025-02-06",2025,"billed",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2025-02-07",2025,"unbilled",33195.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2025-02-20",2025,"unbilled",92946.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2025-02-22",2025,"billed",39900.0,"ADES","Behavior Based Safety Coach",2850.0],["2025-03-02",2025,"billed",44200.0,"Maharat","Occupational Health & Safety Management",2600.0],["2025-03-07",2025,"billed",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2025-03-26",2025,"billed",13275.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-03-27",2025,"billed",11062.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-04-01",2025,"billed",66375.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-04-01",2025,"billed",17700.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-04-01",2025,"billed",44200.0,"Maharat","Occupational Health & Safety Management",2600.0],["2025-04-02",2025,"billed",17700.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-04-02",2025,"billed",24337.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-04-04",2025,"billed",26550.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-04-10",2025,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-04-11",2025,"billed",44250.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-04-13",2025,"billed",24337.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-04-14",2025,"billed",37612.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-04-19",2025,"billed",24337.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-04-26",2025,"billed",6637.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-04-29",2025,"billed",4425.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-04-30",2025,"billed",2212.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-01",2025,"billed",13275.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-01",2025,"billed",30975.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-01",2025,"billed",64162.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-01",2025,"billed",44200.0,"Maharat","Occupational Health & Safety Management",2600.0],["2025-05-02",2025,"billed",42037.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-04",2025,"billed",11062.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-06",2025,"billed",6637.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-08",2025,"billed",58500.0,"Arabian Drilling","Rig Move Coach",3656.25],["2025-05-09",2025,"billed",13275.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-12",2025,"billed",54843.75,"Arabian Drilling","Rig Move Coach",3656.25],["2025-05-15",2025,"billed",30975.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-16",2025,"billed",6637.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-20",2025,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-21",2025,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-25",2025,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-27",2025,"billed",11062.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-28",2025,"billed",8850.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-28",2025,"billed",8850.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-29",2025,"billed",6637.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-05-30",2025,"billed",4425.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-01",2025,"billed",19912.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-01",2025,"billed",19912.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-01",2025,"billed",22125.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-01",2025,"billed",24337.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-01",2025,"billed",22125.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-01",2025,"billed",22125.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-01",2025,"billed",11062.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-01",2025,"billed",44200.0,"Maharat","Occupational Health & Safety Management",2600.0],["2025-06-09",2025,"billed",26550.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-10",2025,"billed",11062.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-10",2025,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-10",2025,"billed",26550.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-11",2025,"billed",30975.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-18",2025,"billed",28762.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-06-20",2025,"billed",40218.75,"Arabian Drilling","Rig Move Coach",3656.25],["2025-06-26",2025,"billed",35621.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2025-07-01",2025,"billed",29250.0,"Arabian Drilling","Rig Move Coach",3656.25],["2025-07-01",2025,"billed",39000.0,"Maharat","Occupational Health & Safety Management",2600.0],["2025-07-06",2025,"billed",7312.5,"Arabian Drilling","Rig Move Coach",3656.25],["2025-07-08",2025,"billed",76781.25,"Arabian Drilling","Rig Move Coach",3656.25],["2025-07-09",2025,"billed",28762.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-07-10",2025,"billed",22125.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-07-14",2025,"unbilled",88520.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2025-07-23",2025,"billed",29250.0,"Arabian Drilling","Rig Move Coach",3656.25],["2025-07-23",2025,"billed",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2025-07-26",2025,"billed",13275.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-07-30",2025,"billed",7312.5,"Arabian Drilling","Rig Move Coach",3656.25],["2025-08-01",2025,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-08-01",2025,"billed",32906.25,"Arabian Drilling","Rig Move Coach",3656.25],["2025-08-01",2025,"billed",39000.0,"Maharat","Occupational Health & Safety Management",2600.0],["2025-08-02",2025,"billed",44250.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-08-04",2025,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-08-06",2025,"billed",29250.0,"Arabian Drilling","Rig Move Coach",3656.25],["2025-08-06",2025,"billed",30975.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-08-11",2025,"billed",21937.5,"Arabian Drilling","Rig Move Coach",3656.25],["2025-08-11",2025,"billed",26550.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-08-11",2025,"billed",24937.5,"ADES","Behavior Based Safety Coach",3562.5],["2025-08-16",2025,"billed",4425.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-08-18",2025,"billed",11062.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-08-19",2025,"billed",24337.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-08-20",2025,"unbilled",19917.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2025-08-23",2025,"billed",32906.25,"Arabian Drilling","Rig Move Coach",3656.25],["2025-08-23",2025,"billed",37612.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-08-24",2025,"billed",29250.0,"Arabian Drilling","Rig Move Coach",3656.25],["2025-08-28",2025,"billed",8850.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-08-29",2025,"billed",6637.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-08-29",2025,"unbilled",77455.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2025-09-01",2025,"billed",7312.5,"Arabian Drilling","Rig Move Coach",3656.25],["2025-09-01",2025,"billed",13275.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-09-01",2025,"billed",17700.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-09-01",2025,"billed",7312.5,"Arabian Drilling","Rig Move Coach",3656.25],["2025-09-01",2025,"billed",36400.0,"Maharat","Occupational Health & Safety Management",2600.0],["2025-09-03",2025,"billed",6637.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-09-03",2025,"billed",7312.5,"Arabian Drilling","Rig Move Coach",3656.25],["2025-09-04",2025,"billed",22125.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-09-05",2025,"billed",24937.5,"ADES","Behavior Based Safety Coach",3562.5],["2025-09-06",2025,"billed",10968.75,"Arabian Drilling","Rig Move Coach",3656.25],["2025-09-08",2025,"billed",11062.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-09-09",2025,"billed",29250.0,"Arabian Drilling","Rig Move Coach",3656.25],["2025-09-12",2025,"billed",26550.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-09-18",2025,"billed",13275.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-09-25",2025,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-09-26",2025,"billed",28762.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-10-03",2025,"billed",24337.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-10-03",2025,"unbilled",79668.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2025-10-14",2025,"billed",24337.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-10-15",2025,"billed",33187.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-10-16",2025,"unbilled",30982.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2025-10-21",2025,"billed",3656.25,"Arabian Drilling","Rig Move Coach",3656.25],["2025-10-22",2025,"billed",25593.75,"Arabian Drilling","Rig Move Coach",3656.25],["2025-10-24",2025,"billed",26550.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-10-24",2025,"billed",37612.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-10-25",2025,"billed",30975.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-11-03",2025,"billed",24937.5,"ADES","Behavior Based Safety Coach",3562.5],["2025-11-03",2025,"unbilled",19950.0,"ADES","Behavior Based Safety Coach",2850.0],["2025-11-05",2025,"billed",17700.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-11-08",2025,"billed",24337.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-11-10",2025,"billed",28762.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-11-10",2025,"billed",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2025-11-13",2025,"billed",6637.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-11-15",2025,"billed",8850.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-11-18",2025,"billed",19912.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-11-21",2025,"billed",35400.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-11-26",2025,"billed",8850.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-12-01",2025,"billed",14250.0,"ADES","Behavior Based Safety Coach",3562.5],["2025-12-01",2025,"billed",14300.0,"Maharat","Upskilling Safety Program",550.0],["2025-12-04",2025,"billed",3671815.38,"Saudi Aramco Nabors Drilling","Rig Move Coach",3656.25],["2025-12-11",2025,"billed",37612.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-12-12",2025,"billed",28762.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-12-16",2025,"billed",28762.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-12-17",2025,"billed",70800.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2025-12-18",2025,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-12-18",2025,"billed",26550.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-12-20",2025,"billed",13275.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-12-25",2025,"billed",11062.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-12-25",2025,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-12-25",2025,"billed",22125.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2025-12-30",2025,"billed",81862.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-01-01",2026,"billed",39000.0,"Maharat","Upskilling Safety Program",1500.0],["2026-01-01",2026,"billed",270000.0,"Maharat (Qiddiya)","Qiddiya Project",null],["2026-01-01",2026,"billed",28000.0,"Maharat (Qiddiya)","Qiddiya Project",null],["2026-01-01",2026,"billed",159040.0,"Maharat (Qiddiya)","Qiddiya Project",null],["2026-01-02",2026,"billed",37612.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-01-03",2026,"billed",8850.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-01-07",2026,"billed",17700.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-01-07",2026,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-01-08",2026,"billed",19912.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-01-08",2026,"billed",2212.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-01-09",2026,"billed",6637.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-01-10",2026,"billed",26550.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-01-11",2026,"billed",33187.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-01-11",2026,"billed",13275.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-01-11",2026,"billed",9000.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-01-14",2026,"billed",39900.0,"ADES","Behavior Based Safety Coach",2850.0],["2026-01-20",2026,"billed",59850.0,"ADES","Behavior Based Safety Coach",2850.0],["2026-01-26",2026,"billed",42037.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-01",2026,"billed",39000.0,"Maharat","Upskilling Safety Program",1560.0],["2026-02-01",2026,"billed",1800.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-02-05",2026,"billed",17700.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-06",2026,"billed",13275.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-08",2026,"billed",13275.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-08",2026,"billed",28500.0,"ADES","Behavior Based Safety Coach",2850.0],["2026-02-08",2026,"billed",1800.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-02-12",2026,"billed",4425.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-13",2026,"billed",8850.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-13",2026,"billed",17700.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-14",2026,"billed",11062.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-14",2026,"billed",73012.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-14",2026,"billed",28762.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-16",2026,"billed",19912.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-17",2026,"billed",19950.0,"ADES","Behavior Based Safety Coach",2850.0],["2026-02-17",2026,"billed",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2026-02-19",2026,"billed",11062.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-19",2026,"billed",48686.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-02-20",2026,"billed",50887.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-21",2026,"billed",62700.0,"ADES","Behavior Based Safety Coach",2850.0],["2026-02-21",2026,"billed",62700.0,"ADES","Behavior Based Safety Coach",2850.0],["2026-02-24",2026,"billed",19912.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-24",2026,"billed",24337.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-02-25",2026,"billed",42037.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-03-01",2026,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-03-01",2026,"billed",39000.0,"Maharat","Upskilling Safety Program",1560.0],["2026-03-01",2026,"billed",2700.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-03-08",2026,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-03-09",2026,"billed",37612.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-03-09",2026,"billed",28762.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-03-13",2026,"billed",48686.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-03-17",2026,"billed",28762.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-03-18",2026,"billed",15487.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-03-18",2026,"billed",19912.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-03-19",2026,"billed",13275.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-03-19",2026,"billed",19912.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-03-19",2026,"billed",28762.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-03-19",2026,"billed",42047.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-03-20",2026,"billed",47250.0,"ADES","Lifting Coach",3375.0],["2026-03-22",2026,"billed",24337.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-03-25",2026,"billed",13275.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-03-26",2026,"billed",19950.0,"ADES","Behavior Based Safety Coach",2850.0],["2026-03-30",2026,"billed",4425.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-04-01",2026,"billed",39000.0,"Maharat","Upskilling Safety Program",1560.0],["2026-04-03",2026,"billed",50625.0,"ADES","Lifting Coach",3375.0],["2026-04-05",2026,"billed",3600.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-04-05",2026,"billed",900.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-04-06",2026,"billed",47250.0,"ADES","Lifting Coach",3375.0],["2026-04-07",2026,"billed",31350.0,"ADES","Behavior Based Safety Coach",2850.0],["2026-04-11",2026,"billed",42900.0,"Saudi Aramco Nabors Drilling","Permit to Work Performance Coaching Program",3656.25],["2026-04-12",2026,"billed",2700.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-04-13",2026,"billed",17700.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-04-13",2026,"billed",22125.0,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-04-13",2026,"billed",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2026-04-14",2026,"billed",54150.0,"ADES","Behavior Based Safety Coach",2850.0],["2026-04-19",2026,"billed",55325.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-04-23",2026,"unbilled",28500.0,"ADES","Behavior Based Safety Coach",2850.0],["2026-04-23",2026,"billed",48686.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-04-25",2026,"billed",39834.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-05-01",2026,"billed",30375.0,"ADES","Lifting Coach",3375.0],["2026-05-01",2026,"billed",43875.0,"ADES","Lifting Coach",3375.0],["2026-05-01",2026,"billed",39000.0,"Maharat","Upskilling Safety Program",1560.0],["2026-05-02",2026,"billed",62700.0,"ADES","Behavior Based Safety Coach",2850.0],["2026-05-04",2026,"billed",47250.0,"ADES","Lifting Coach",3375.0],["2026-05-11",2026,"unbilled",50625.0,"ADES","Lifting Coach",3375.0],["2026-05-16",2026,"billed",33195.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-06-01",2026,"billed",39000.0,"Maharat","Upskilling Safety Program",1560.0],["2026-06-03",2026,"billed",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2026-06-04",2026,"billed",37621.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-06-07",2026,"billed",17100.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-06-07",2026,"billed",900.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-06-08",2026,"unbilled",60750.0,"ADES","Lifting Coach",3375.0],["2026-06-14",2026,"billed",9900.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-06-15",2026,"billed",23625.0,"ADES","Lifting Coach",3375.0],["2026-06-18",2026,"billed",28769.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-06-21",2026,"billed",22130.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-06-21",2026,"billed",9000.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-06-22",2026,"unbilled",23625.0,"ADES","Lifting Coach",3375.0],["2026-06-25",2026,"billed",6637.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5],["2026-06-28",2026,"billed",10125.0,"ADES","Lifting Coach",3375.0],["2026-07-01",2026,"billed",27000.0,"ADES","Lifting Coach",3375.0],["2026-07-01",2026,"billed",11065.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-07-01",2026,"billed",19917.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-07-01",2026,"unbilled",8852.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-07-01",2026,"billed",39000.0,"Maharat","Upskilling Safety Program",1560.0],["2026-07-02",2026,"billed",48686.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-07-05",2026,"billed",9000.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-07-05",2026,"billed",2700.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-07-05",2026,"billed",1800.0,"Maharat ( CSM )","Construction Safety Manual",1500.0],["2026-07-06",2026,"billed",50899.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-07-06",2026,"unbilled",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2026-07-13",2026,"unbilled",23625.0,"ADES","Lifting Coach",3375.0],["2026-07-27",2026,"billed",16875.0,"ADES","Lifting Coach",3375.0],["2026-08-01",2026,"unbilled",22130.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-08-01",2026,"unbilled",11065.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-08-06",2026,"unbilled",33195.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-08-11",2026,"unbilled",22130.0,"Aramco Rawan","Rig Safety Coach",2213.0],["2026-08-12",2026,"unbilled",59625.0,"Aramco Rawan","Rig Safety Coach",59625.0],["2026-08-22",2026,"unbilled",19912.5,"Arabian Drilling","Rig Safety Training Coordinator",2212.5]];
+
+function loadEmbeddedData(){
+  allTxns = EMBEDDED_TRANSACTIONS.map(r => ({
+    date: new Date(r[0]), year: r[1], status: r[2], amount: r[3], company: r[4] || 'Unknown',
+    course: r[5] || 'N/A', price: r[6]
+  }));
+  allTxns.sort((a,b)=> a.date - b.date);
+  years = [...new Set(allTxns.map(t=>t.year))].sort();
+  companies = [...new Set(allTxns.map(t=>t.company))].sort();
+  setStatus(true, 'Loaded from Projects_2.xlsb — all sheets');
+  document.getElementById('fileNameLabel').textContent = 'Projects_2.xlsb (all companies)';
+  rebuildYearFilter();
+  rebuildCompanyFilter();
+  render();
+}
+
+// ---------- Excel loading ----------
+const fileInput = document.getElementById('fileInput');
+const loadBtn = document.getElementById('loadBtn');
+loadBtn.addEventListener('click', ()=> fileInput.click());
+
+// ---------- Auto-watch via File System Access API (Chrome / Edge) ----------
+const watchBtn = document.getElementById('watchBtn');
+let watchedHandle = null;
+let watchedLastModified = null;
+let watchTimer = null;
+
+const supportsFSAccess = 'showOpenFilePicker' in window;
+if(!supportsFSAccess){
+  watchBtn.textContent = '🔄 ربط ملف Excel (غير مدعوم في هذا المتصفح)';
+  watchBtn.title = 'التحديث التلقائي متاح فقط في Chrome أو Edge. استخدم Load Excel File بدلاً من ذلك.';
+}
+
+watchBtn.addEventListener('click', async ()=>{
+  if(!supportsFSAccess){
+    showError('التحديث التلقائي يعمل فقط على متصفح Chrome أو Edge. افتح الداشبورد من أحدهما، أو استخدم زر Load Excel File يدويًا.');
+    return;
+  }
+  try{
+    const [handle] = await window.showOpenFilePicker({
+      types: [{ description:'Excel/CSV', accept:{
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx'],
+        'application/vnd.ms-excel':['.xls'],
+        'text/csv':['.csv']
+      }}]
+    });
+    watchedHandle = handle;
+    await readWatchedFile(true);
+    startWatching();
+    watchBtn.textContent = '🔄 متصل — يراقب التغييرات';
+    watchBtn.classList.add('watching');
+  }catch(err){
+    if(err.name !== 'AbortError'){
+      showError('تعذّر ربط الملف: ' + err.message);
+    }
+  }
+});
+
+async function readWatchedFile(isFirstLoad){
+  if(!watchedHandle) return;
+  const file = await watchedHandle.getFile();
+  if(!isFirstLoad && file.lastModified === watchedLastModified) return; // no change
+  watchedLastModified = file.lastModified;
+  const buf = await file.arrayBuffer();
+  try{
+    const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, {defval:null});
+    parseRows(rows, file.name);
+  }catch(err){
+    showError('تعذّر قراءة الملف بعد التحديث: ' + err.message);
+  }
+}
+
+function startWatching(){
+  if(watchTimer) clearInterval(watchTimer);
+  watchTimer = setInterval(()=> readWatchedFile(false), 3000); // check every 3 seconds
+}
+
+// ---------- Cloud link auto-refresh (works for anyone who opens this dashboard, e.g. your manager) ----------
+const cloudUrlInput = document.getElementById('cloudUrlInput');
+const cloudConnectBtn = document.getElementById('cloudConnectBtn');
+let cloudUrl = null;
+let cloudTimer = null;
+let cloudLastSize = null;
+
+function toDirectDownloadUrl(url){
+  url = url.trim();
+  if(url.includes('1drv.ms') || url.includes('onedrive.live.com') || url.includes('sharepoint.com')){
+    return url.includes('?') ? url + '&download=1' : url + '?download=1';
+  }
+  return url;
+}
+
+async function fetchCloudFile(isFirstLoad){
+  if(!cloudUrl) return;
+  try{
+    const resp = await fetch(cloudUrl, {cache:'no-store'});
+    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+    const buf = await resp.arrayBuffer();
+    if(!isFirstLoad && buf.byteLength === cloudLastSize) return; // no change, skip re-parse
+    cloudLastSize = buf.byteLength;
+    const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:true});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, {defval:null});
+    parseRows(rows, 'رابط سحابي (OneDrive/SharePoint)');
+    setStatus(true, 'متصل بالسحابة — يتحدث تلقائيًا للجميع');
+  }catch(err){
+    showError('تعذّر جلب الملف من الرابط السحابي: ' + err.message + '. تأكد أن مشاركة الملف مفعّلة لأي شخص لديه الرابط، أو جرّب المزامنة المحلية بدلاً من ذلك.');
+  }
+}
+
+cloudConnectBtn.addEventListener('click', async ()=>{
+  const raw = cloudUrlInput.value.trim();
+  if(!raw){ showError('الصق رابط مشاركة OneDrive أو SharePoint أولاً.'); return; }
+  cloudUrl = toDirectDownloadUrl(raw);
+  await fetchCloudFile(true);
+  if(cloudTimer) clearInterval(cloudTimer);
+  cloudTimer = setInterval(()=> fetchCloudFile(false), 60000); // check every 60 seconds
+  cloudConnectBtn.textContent = '🔗 متصل — يفحص كل دقيقة';
+  cloudConnectBtn.classList.add('watching');
+});
+
+fileInput.addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt)=>{
+    try{
+      const data = new Uint8Array(evt.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:true});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {defval:null});
+      parseRows(rows, file.name);
+    }catch(err){
+      showError('Could not read that file. Make sure it\'s a valid .xlsx/.xls/.csv export. (' + err.message + ')');
+    }
+  };
+  reader.onerror = ()=> showError('Failed to read the file from disk.');
+  reader.readAsArrayBuffer(file);
+});
+
+function findKey(row, candidates){
+  const keys = Object.keys(row);
+  for(const cand of candidates){
+    const hit = keys.find(k => k.trim().toLowerCase() === cand);
+    if(hit) return hit;
+  }
+  // loose contains-match fallback
+  for(const cand of candidates){
+    const hit = keys.find(k => k.trim().toLowerCase().includes(cand));
+    if(hit) return hit;
+  }
+  return null;
+}
+
+function parseRows(rows, filename){
+  if(!rows.length){
+    showError('That file has no data rows on its first sheet.');
+    return;
+  }
+  const sample = rows[0];
+  const dateKey = findKey(sample, ['date']);
+  const yearKey = findKey(sample, ['year']);
+  const statusKey = findKey(sample, ['status', 'billing status']);
+  const amountKey = findKey(sample, ['amount (sar)', 'amount', 'revenue']);
+  const companyKey = findKey(sample, ['company']);
+  const courseKey = findKey(sample, ['course', 'service']);
+  const priceKey = findKey(sample, ['service price', 'price']);
+
+  if(!statusKey || !amountKey){
+    showError('Couldn\'t find "Status" and "Amount" columns in that file. Expected columns: Date, Year, Status, Amount (SAR).');
+    return;
+  }
+
+  const parsed = [];
+  let skipped = 0;
+  rows.forEach(r => {
+    const amtRaw = r[amountKey];
+    const amount = typeof amtRaw === 'number' ? amtRaw : parseFloat(String(amtRaw).replace(/[, ]/g,''));
+    const statusRaw = (r[statusKey] || '').toString().trim().toLowerCase();
+    const status = statusRaw.startsWith('unbill') ? 'unbilled' : (statusRaw.startsWith('bill') ? 'billed' : null);
+    const company = companyKey ? String(r[companyKey] || 'Unknown').trim() : 'Unknown';
+    const course = courseKey ? String(r[courseKey] || 'N/A').trim() : 'N/A';
+    const priceRaw = priceKey ? r[priceKey] : null;
+    const price = typeof priceRaw === 'number' ? priceRaw : (priceRaw ? parseFloat(String(priceRaw).replace(/[, ]/g,'')) : null);
+
+    let dateVal = dateKey ? r[dateKey] : null;
+    let year = yearKey ? parseInt(r[yearKey]) : null;
+    if(!year && dateVal instanceof Date) year = dateVal.getFullYear();
+    if(!year && typeof dateVal === 'string'){
+      const m = dateVal.match(/(20\d{2})/);
+      if(m) year = parseInt(m[1]);
+    }
+
+    if(isNaN(amount) || !status || !year){ skipped++; return; }
+    parsed.push({ year, status, amount, company, course, price: (price && !isNaN(price)) ? price : null, date: dateVal instanceof Date ? dateVal : null });
+  });
+
+  if(!parsed.length){
+    showError('Found the columns, but no rows had valid Year / Status / Amount values.');
+    return;
+  }
+
+  // sort by date if we have it, else keep file order
+  if(parsed.every(p=>p.date)){
+    parsed.sort((a,b)=> a.date - b.date);
+  }
+
+  allTxns = parsed;
+  years = [...new Set(parsed.map(p=>p.year))].sort();
+  companies = [...new Set(parsed.map(p=>p.company))].sort();
+  hideError();
+  setStatus(true, 'Live from ' + filename);
+  document.getElementById('fileNameLabel').textContent = filename + (skipped ? ` (${skipped} row(s) skipped)` : '');
+  rebuildYearFilter();
+  rebuildCompanyFilter();
+  render();
+}
+
+let selectedYears = []; // empty = All Years
+
+function rebuildYearFilter(){
+  const panel = document.getElementById('yearFilterPanel');
+  const btn = document.getElementById('yearFilterBtn');
+  // keep only still-valid selections
+  selectedYears = selectedYears.filter(y => years.includes(y));
+
+  panel.innerHTML = `<label><input type="checkbox" data-year="all" ${selectedYears.length===0?'checked':''}> All Years</label>` +
+    years.map(y => `<label><input type="checkbox" data-year="${y}" ${selectedYears.includes(y)?'checked':''}> ${y}</label>`).join('');
+
+  panel.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if(cb.dataset.year === 'all'){
+        selectedYears = [];
+      } else {
+        const y = parseInt(cb.dataset.year);
+        if(cb.checked) selectedYears.push(y);
+        else selectedYears = selectedYears.filter(v=>v!==y);
+        if(selectedYears.length === years.length) selectedYears = []; // all selected == "All Years"
+      }
+      rebuildYearFilter();
+      render();
+    });
+  });
+
+  btn.textContent = selectedYears.length===0 ? 'All Years' : selectedYears.slice().sort().join(', ');
+
+  document.getElementById('yearRangeLabel').textContent =
+    years.length ? `FY${years[0]}${years.length>1 ? '–FY'+years[years.length-1] : ''}` : '';
+}
+
+document.getElementById('yearFilterBtn').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  document.getElementById('yearFilterPanel').classList.toggle('open');
+});
+document.addEventListener('click', (e)=>{
+  const box = document.getElementById('yearFilterBox');
+  if(box && !box.contains(e.target)) document.getElementById('yearFilterPanel').classList.remove('open');
+});
+
+function setStatus(live, label){
+  document.getElementById('statusDot').classList.toggle('stale', !live);
+  document.getElementById('statusText').textContent = label;
+}
+function showError(msg){
+  const el = document.getElementById('errorBanner');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+function hideError(){
+  document.getElementById('errorBanner').style.display = 'none';
+}
+
+function rebuildCompanyFilter(){
+  const sel = document.getElementById('companyFilter');
+  const current = sel.value;
+  sel.innerHTML = '<option value="all">All Companies</option>' +
+    companies.map(c=>`<option value="${c}">${c}</option>`).join('');
+  sel.value = companies.includes(current) ? current : 'all';
+  document.getElementById('companyLabel').textContent = sel.value === 'all' ? 'All Companies' : sel.value;
+}
+
+// ---------- Formatting ----------
+const fmt = n => n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmtInt = n => Math.round(n).toLocaleString('en-US');
+
+// ---------- Charts (pure SVG, no external library) ----------
+function computeFiltered(yearsSelected, status, company){
+  const yrs = Array.isArray(yearsSelected) ? yearsSelected : (yearsSelected==='all' ? [] : [parseInt(yearsSelected)]);
+  return allTxns.filter(t =>
+    (yrs.length===0 || yrs.includes(t.year)) &&
+    (status==='all' || t.status===status) &&
+    (company==='all' || t.company===company)
+  );
+}
+
+function svgEl(tag, attrs){
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for(const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+function drawTrendChart(billedSeries, unbilledSeries){
+  const W = 560, H = 230, padL = 60, padR = 10, padT = 10, padB = 30;
+  const n = billedSeries.length;
+  const maxVal = Math.max(1, ...billedSeries, ...unbilledSeries);
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`});
+  const xAt = i => padL + (n<=1 ? 0 : (i/(n-1)) * (W-padL-padR));
+  const yAt = v => H - padB - (v/maxVal) * (H-padT-padB);
+
+  // gridlines + y labels
+  for(let g=0; g<=4; g++){
+    const val = maxVal * g/4;
+    const y = yAt(val);
+    svg.appendChild(svgEl('line', {x1:padL, x2:W-padR, y1:y, y2:y, stroke:'#eef0f4', 'stroke-width':1}));
+    const t = svgEl('text', {x:padL-6, y:y+3, 'text-anchor':'end', 'font-size':'9', fill:'#68708a'});
+    t.textContent = Math.round(val).toLocaleString('en-US');
+    svg.appendChild(t);
+  }
+
+  function pathFor(series){
+    if(n===0) return '';
+    return series.map((v,i)=> (i===0?'M':'L') + xAt(i).toFixed(1) + ',' + yAt(v).toFixed(1)).join(' ');
+  }
+  function areaFor(series){
+    if(n===0) return '';
+    return pathFor(series) + ` L${xAt(n-1).toFixed(1)},${(H-padB)} L${xAt(0).toFixed(1)},${(H-padB)} Z`;
+  }
+
+  if(n>0){
+    svg.appendChild(svgEl('path', {d:areaFor(billedSeries), fill:blueLight, stroke:'none'}));
+    svg.appendChild(svgEl('path', {d:pathFor(billedSeries), fill:'none', stroke:blue, 'stroke-width':2}));
+    svg.appendChild(svgEl('path', {d:areaFor(unbilledSeries), fill:'rgba(217,154,43,0.08)', stroke:'none'}));
+    svg.appendChild(svgEl('path', {d:pathFor(unbilledSeries), fill:'none', stroke:amber, 'stroke-width':2}));
+  }
+
+  // x-axis label
+  const xl = svgEl('text', {x:(padL+W-padR)/2, y:H-4, 'text-anchor':'middle', 'font-size':'10', fill:'#68708a'});
+  xl.textContent = 'Transaction #';
+  svg.appendChild(xl);
+
+  document.getElementById('trendChart').innerHTML = '';
+  document.getElementById('trendChart').appendChild(svg);
+}
+
+function drawBarChart(labels, billedVals, unbilledVals){
+  const W = 400, H = 230, padL = 55, padR = 10, padT = 10, padB = 30;
+  const maxVal = Math.max(1, ...billedVals, ...unbilledVals);
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`});
+  const groupW = (W-padL-padR) / Math.max(1, labels.length);
+  const barW = Math.min(40, groupW*0.32);
+
+  for(let g=0; g<=4; g++){
+    const val = maxVal * g/4;
+    const y = padT + (H-padT-padB) - (val/maxVal)*(H-padT-padB);
+    svg.appendChild(svgEl('line', {x1:padL, x2:W-padR, y1:y, y2:y, stroke:'#eef0f4', 'stroke-width':1}));
+    const t = svgEl('text', {x:padL-6, y:y+3, 'text-anchor':'end', 'font-size':'9', fill:'#68708a'});
+    t.textContent = Math.round(val).toLocaleString('en-US');
+    svg.appendChild(t);
+  }
+
+  labels.forEach((lab, i)=>{
+    const cx = padL + groupW*i + groupW/2;
+    const bH1 = (billedVals[i]/maxVal) * (H-padT-padB);
+    const bH2 = (unbilledVals[i]/maxVal) * (H-padT-padB);
+    const baseY = H-padB;
+    svg.appendChild(svgEl('rect', {x:cx-barW-2, y:baseY-bH1, width:barW, height:Math.max(0,bH1), fill:blue, rx:2}));
+    svg.appendChild(svgEl('rect', {x:cx+2, y:baseY-bH2, width:barW, height:Math.max(0,bH2), fill:amber, rx:2}));
+    const t = svgEl('text', {x:cx, y:H-8, 'text-anchor':'middle', 'font-size':'10', fill:'#68708a'});
+    t.textContent = lab;
+    svg.appendChild(t);
+  });
+
+  document.getElementById('barChart').innerHTML = '';
+  document.getElementById('barChart').appendChild(svg);
+}
+
+function drawMonthlyChart(labels, billedVals, unbilledVals){
+  const H = 260, padL = 65, padR = 10, padT = 10, padB = 40;
+  const barSlot = 46; // width per month
+  const W = Math.max(600, padL + padR + barSlot * Math.max(1, labels.length));
+  const maxVal = Math.max(1, ...labels.map((_,i)=> billedVals[i]+unbilledVals[i]));
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`});
+
+  for(let g=0; g<=4; g++){
+    const val = maxVal * g/4;
+    const y = padT + (H-padT-padB) - (val/maxVal)*(H-padT-padB);
+    svg.appendChild(svgEl('line', {x1:padL, x2:W-padR, y1:y, y2:y, stroke:'#eef0f4', 'stroke-width':1}));
+    const t = svgEl('text', {x:padL-6, y:y+3, 'text-anchor':'end', 'font-size':'9', fill:'#68708a'});
+    t.textContent = Math.round(val).toLocaleString('en-US');
+    svg.appendChild(t);
+  }
+
+  const barW = Math.min(30, barSlot*0.6);
+  labels.forEach((lab, i)=>{
+    const cx = padL + barSlot*i + barSlot/2;
+    const bH1 = (billedVals[i]/maxVal) * (H-padT-padB);
+    const bH2 = (unbilledVals[i]/maxVal) * (H-padT-padB);
+    const baseY = H-padB;
+    svg.appendChild(svgEl('rect', {x:cx-barW/2, y:baseY-bH1-bH2, width:barW, height:Math.max(0,bH2), fill:amber, rx:2}));
+    svg.appendChild(svgEl('rect', {x:cx-barW/2, y:baseY-bH1, width:barW, height:Math.max(0,bH1), fill:blue, rx:2}));
+    const total = billedVals[i]+unbilledVals[i];
+    if(total>0){
+      const t = svgEl('text', {x:cx, y:baseY-bH1-bH2-4, 'text-anchor':'middle', 'font-size':'8.5', fill:'#68708a'});
+      t.textContent = Math.round(total).toLocaleString('en-US');
+      svg.appendChild(t);
+    }
+    const lbl = svgEl('text', {x:cx, y:H-padB+16, 'text-anchor':'middle', 'font-size':'9.5', fill:'#68708a', transform:`rotate(-40 ${cx} ${H-padB+16})`});
+    lbl.textContent = lab;
+    svg.appendChild(lbl);
+  });
+
+  document.getElementById('monthlyChart').innerHTML = '';
+  document.getElementById('monthlyChart').appendChild(svg);
+}
+
+function drawDonutChart(billedSum, unbilledSum){
+  const size = 220, cx = size/2, cy = size/2, r = 80, sw = 30;
+  const total = billedSum + unbilledSum;
+  const svg = svgEl('svg', {viewBox:`0 0 ${size} ${size}`});
+  const circumference = 2*Math.PI*r;
+
+  if(total <= 0){
+    svg.appendChild(svgEl('circle', {cx, cy, r, fill:'none', stroke:'#eef0f4', 'stroke-width':sw}));
+  } else {
+    const billedFrac = billedSum/total;
+    const billedLen = circumference * billedFrac;
+    const unbilledLen = circumference - billedLen;
+
+    const c1 = svgEl('circle', {
+      cx, cy, r, fill:'none', stroke:amber, 'stroke-width':sw,
+      'stroke-dasharray':`${circumference} ${circumference}`,
+      transform:`rotate(-90 ${cx} ${cy})`
+    });
+    svg.appendChild(c1);
+
+    const c2 = svgEl('circle', {
+      cx, cy, r, fill:'none', stroke:blue, 'stroke-width':sw,
+      'stroke-dasharray':`${billedLen} ${circumference}`,
+      transform:`rotate(-90 ${cx} ${cy})`
+    });
+    svg.appendChild(c2);
+  }
+
+  document.getElementById('donutChart').innerHTML = '';
+  document.getElementById('donutChart').appendChild(svg);
+}
+
+function drawAvgBarChart(rows, targetId){
+  // rows: [{label, avgBilled, avgUnbilled}], sorted desc by avgBilled
+  const rowH = 34, padTop = 10, padBottom = 30, labelW = 190, padR = 60;
+  const W = 900, H = padTop + padBottom + rowH * Math.max(1, rows.length);
+  const maxVal = Math.max(1, ...rows.map(r=>Math.max(r.avgBilled, r.avgUnbilled)));
+  const chartW = W - labelW - padR;
+  const svg = svgEl('svg', {viewBox:`0 0 ${W} ${H}`});
+
+  rows.forEach((r, i)=>{
+    const y = padTop + i*rowH;
+    const label = svgEl('text', {x:labelW-10, y:y+rowH/2+4, 'text-anchor':'end', 'font-size':'11', fill:'#1a2233'});
+    label.textContent = r.label;
+    svg.appendChild(label);
+
+    const barH = 10;
+    const wBilled = (r.avgBilled/maxVal) * chartW;
+    const wUnbilled = (r.avgUnbilled/maxVal) * chartW;
+
+    svg.appendChild(svgEl('rect', {x:labelW, y:y+4, width:Math.max(0,wBilled), height:barH, fill:blue, rx:2}));
+    svg.appendChild(svgEl('rect', {x:labelW, y:y+4+barH+3, width:Math.max(0,wUnbilled), height:barH, fill:amber, rx:2}));
+
+    const t1 = svgEl('text', {x:labelW+wBilled+6, y:y+4+barH-1, 'font-size':'9.5', fill:'#68708a'});
+    t1.textContent = Math.round(r.avgBilled).toLocaleString('en-US');
+    svg.appendChild(t1);
+    if(r.avgUnbilled>0){
+      const t2 = svgEl('text', {x:labelW+wUnbilled+6, y:y+4+barH+3+barH-1, 'font-size':'9.5', fill:'#68708a'});
+      t2.textContent = Math.round(r.avgUnbilled).toLocaleString('en-US');
+      svg.appendChild(t2);
+    }
+  });
+
+  document.getElementById(targetId).innerHTML = '';
+  document.getElementById(targetId).appendChild(svg);
+}
+
+function render(){
+  const status = document.getElementById('statusFilter').value;
+  const company = document.getElementById('companyFilter').value;
+  document.getElementById('companyLabel').textContent = company === 'all' ? 'All Companies' : company;
+  const filtered = computeFiltered(selectedYears, status, company);
+
+  const billed = filtered.filter(t=>t.status==='billed');
+  const unbilled = filtered.filter(t=>t.status==='unbilled');
+  const billedSum = billed.reduce((s,t)=>s+t.amount,0);
+  const unbilledSum = unbilled.reduce((s,t)=>s+t.amount,0);
+  const total = billedSum + unbilledSum;
+
+  document.getElementById('txnCountLabel').textContent = allTxns.length;
+  document.getElementById('kpiTotal').textContent = total ? fmt(total)+' SAR' : '0.00 SAR';
+  document.getElementById('kpiTotalSub').textContent = filtered.length + ' transactions';
+  document.getElementById('kpiBilled').textContent = fmt(billedSum) + ' SAR';
+  document.getElementById('kpiBilledSub').textContent = '▲ ' + (total? (billedSum/total*100).toFixed(1):'0.0') + '% of total';
+  document.getElementById('kpiUnbilled').textContent = fmt(unbilledSum) + ' SAR';
+  document.getElementById('kpiUnbilledSub').textContent = '● ' + (total? (unbilledSum/total*100).toFixed(1):'0.0') + '% of total';
+
+  // Cumulative trend
+  let cumBilled=0, cumUnbilled=0;
+  const billedSeries=[], unbilledSeries=[];
+  filtered.forEach((t)=>{
+    if(t.status==='billed') cumBilled += t.amount; else cumUnbilled += t.amount;
+    billedSeries.push(Math.round(cumBilled*100)/100);
+    unbilledSeries.push(Math.round(cumUnbilled*100)/100);
+  });
+  drawTrendChart(billedSeries, unbilledSeries);
+
+  // Bar by year
+  const barLabels = years.length ? years : ['—'];
+  const billedByYear = barLabels.map(y => filtered.filter(t=>t.year===y && t.status==='billed').reduce((s,t)=>s+t.amount,0));
+  const unbilledByYear = barLabels.map(y => filtered.filter(t=>t.year===y && t.status==='unbilled').reduce((s,t)=>s+t.amount,0));
+  drawBarChart(barLabels, billedByYear, unbilledByYear);
+
+  // Monthly revenue
+  const monthKeys = [...new Set(filtered.map(t => `${t.date.getFullYear()}-${String(t.date.getMonth()+1).padStart(2,'0')}`))].sort();
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthLabels = monthKeys.map(k => { const [y,m] = k.split('-'); return `${monthNames[parseInt(m)-1]} ${y}`; });
+  const billedByMonth = monthKeys.map(k => filtered.filter(t => t.status==='billed' && `${t.date.getFullYear()}-${String(t.date.getMonth()+1).padStart(2,'0')}`===k).reduce((s,t)=>s+t.amount,0));
+  const unbilledByMonth = monthKeys.map(k => filtered.filter(t => t.status==='unbilled' && `${t.date.getFullYear()}-${String(t.date.getMonth()+1).padStart(2,'0')}`===k).reduce((s,t)=>s+t.amount,0));
+  drawMonthlyChart(monthLabels, billedByMonth, unbilledByMonth);
+
+  // Donut
+  drawDonutChart(billedSum, unbilledSum);
+  const bPct = total? (billedSum/total*100).toFixed(1):'0.0';
+  const uPct = total? (unbilledSum/total*100).toFixed(1):'0.0';
+  document.getElementById('donutLegend').innerHTML =
+    `<span><i style="background:${blue}"></i>Billed — ${bPct}%</span>` +
+    `<span><i style="background:${amber}"></i>Unbilled — ${uPct}%</span>`;
+
+  // Average revenue per company (billed vs unbilled)
+  const companyList = company === 'all' ? companies : [company];
+  const companyRows = companyList.map(c => {
+    const cBilled = filtered.filter(t=>t.company===c && t.status==='billed').map(t=>t.amount);
+    const cUnbilled = filtered.filter(t=>t.company===c && t.status==='unbilled').map(t=>t.amount);
+    return {
+      label: c,
+      avgBilled: cBilled.length ? cBilled.reduce((a,b)=>a+b,0)/cBilled.length : 0,
+      avgUnbilled: cUnbilled.length ? cUnbilled.reduce((a,b)=>a+b,0)/cUnbilled.length : 0
+    };
+  }).filter(r => r.avgBilled>0 || r.avgUnbilled>0)
+    .sort((a,b)=> b.avgBilled - a.avgBilled);
+  drawAvgBarChart(companyRows, 'companyAvgChart');
+
+  // Average revenue per service/course (billed vs unbilled)
+  const serviceList = [...new Set(filtered.map(t=>t.course || 'N/A'))];
+  const serviceRows = serviceList.map(svc => {
+    const sBilled = filtered.filter(t=>(t.course||'N/A')===svc && t.status==='billed').map(t=>t.amount);
+    const sUnbilled = filtered.filter(t=>(t.course||'N/A')===svc && t.status==='unbilled').map(t=>t.amount);
+    return {
+      label: svc,
+      avgBilled: sBilled.length ? sBilled.reduce((a,b)=>a+b,0)/sBilled.length : 0,
+      avgUnbilled: sUnbilled.length ? sUnbilled.reduce((a,b)=>a+b,0)/sUnbilled.length : 0
+    };
+  }).filter(r => r.avgBilled>0 || r.avgUnbilled>0)
+    .sort((a,b)=> b.avgBilled - a.avgBilled);
+  drawAvgBarChart(serviceRows, 'serviceAvgChart');
+
+  // Courses table: Company + Course, revenue by year (respects Company & Status filters, ignores Year filter to always show all 3 years)
+  const forTable = computeFiltered('all', status, company);
+  const courseMap = new Map();
+  forTable.forEach(t => {
+    const key = t.company + '|||' + (t.course || 'N/A');
+    if(!courseMap.has(key)){
+      courseMap.set(key, { company: t.company, course: t.course || 'N/A', rev2024:0, rev2025:0, rev2026:0 });
+    }
+    const row = courseMap.get(key);
+    if(t.year===2024) row.rev2024 += t.amount;
+    else if(t.year===2025) row.rev2025 += t.amount;
+    else if(t.year===2026) row.rev2026 += t.amount;
+  });
+  const courseRows = [...courseMap.values()].map(r => ({
+    ...r,
+    total: r.rev2024 + r.rev2025 + r.rev2026
+  })).sort((a,b)=> a.company.localeCompare(b.company) || b.total - a.total);
+
+  const tbody = document.getElementById('coursesTableBody');
+  const cellNum = (v) => v>0 ? `<td class="num">${fmtInt(v)}</td>` : `<td class="num zero">—</td>`;
+  tbody.innerHTML = courseRows.map(r => `
+    <tr>
+      <td>${r.company}</td>
+      <td>${r.course}</td>
+      ${cellNum(r.rev2024)}
+      ${cellNum(r.rev2025)}
+      ${cellNum(r.rev2026)}
+      <td class="num total">${fmtInt(r.total)}</td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('statusFilter').addEventListener('change', render);
+document.getElementById('companyFilter').addEventListener('change', render);
+
+loadEmbeddedData();
+</script>
+</body>
+</html>
